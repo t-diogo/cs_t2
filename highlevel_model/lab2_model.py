@@ -1,4 +1,4 @@
-# 2nd order sigma delta modulator
+# High Level Model for 2nd order sigma delta modulator
 
 import time
 import numpy as np
