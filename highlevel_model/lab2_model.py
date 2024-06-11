@@ -121,7 +121,6 @@ results_nofilter = {noise: [] for noise in noise_levels}
 results_filtered = {noise: [] for noise in noise_levels}
 
 
-
 ###################### Simulation loop ######################
 
 
@@ -244,6 +243,38 @@ if sinad:
 else:
     # Regular input signal
 
+    plt.figure(figsize=(10, 8))
+
+    # Input signal subplot
+    plt.subplot(3, 1, 1)
+    plt.plot(vin, label='Input Signal', color='green')
+    plt.xlabel('Sample Index')
+    plt.ylabel('Amplitude')
+    plt.title('Input Signal')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    # Output bit stream subplot
+    plt.subplot(3, 1, 2)
+    plt.plot(dout, label='Output Bit Stream', color='blue', marker='o', linestyle='-')
+    plt.xlabel('Sample Index')
+    plt.ylabel('Bit Value')
+    plt.title('Output Bit Stream (Middle 400 Samples)')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    # Sinc filter output subplot
+    plt.subplot(3, 1, 3)
+    plt.plot(doutf, label='3rd Order Sinc Filter', color='orange')
+    plt.xlabel('Sample Index')
+    plt.ylabel('Amplitude')
+    plt.title('Output Signal Filtered Using 3rd Order Sinc Filter')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
     # Output spectrum for non-filtered output
 
     fin = f         # input signal frequency stays the same
@@ -292,19 +323,6 @@ else:
              arrowprops = dict(facecolor = 'black', width = 0.2, headwidth = 8),
              horizontalalignment = 'center')
     
-    # Input Signal, Output bit stream and Sinc Filter output
-    plt.figure()
-    plt.subplot(3, 1, 1)
-    plt.plot(vin,label='Input signal')
-    plt.legend()
-    plt.subplot(3, 1, 2)
-    plt.plot(dout,label='Output bit stream')
-    plt.legend()
-    plt.subplot(3, 1, 3)
-    plt.plot(doutf,label = '3rd order sinc filter')
-    plt.title('Output signal filtered using 3rd order sinc filter')
-    plt.legend()
-
 # Show all plots
 plt.show()
 
