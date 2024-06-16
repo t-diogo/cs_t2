@@ -68,17 +68,16 @@ def third_order_sinc_filter(dout, N):
 
 
 # Modulator parameters
-Vr = 1
+Vr = 2.24           # Reference voltage
 
-OSR = 66.5          # Oversampling ratio
+OSR = 100           # Oversampling ratio
 B = 20e3            # Signal bandwidth
-Fs = OSR*2*B        # Sampling frequency
+Fs = 2*B*OSR        # Sampling frequency
 
 
 # Simulation parameters
 np_points = 50000       # Number of points
 
-#sinad = False           # do SINAD analysis (True) or regular input signal (False) - f)
 real = False             # test with integrators with finite gain (True) or infinite gain (False) - g)
 
 # Define coefficients
@@ -92,12 +91,13 @@ B2 = 1
 # Finite gain - A = 40dB = 100
 A = 100
 if real:
-    B1 = 1 - (k1/A) * (1 + 1/Vr)
-    B2 = 1 - (k2/A) * (1 + 1/Vr)
+    B1 = (A + 1) / (A + 2 + b1)
+    B2 = (A + 1) / (A + 2 + b2)
 
 # Input signal - sine wave 1kHz
 f = 1e3
 f = round((f/Fs) * np_points ) * (Fs/np_points)
+print(f)
 
 # Time vector
 t = np.arange(np_points) / Fs
@@ -144,7 +144,6 @@ for noise in noise_levels:
     dout = second_order_sigma_delta_modulator(vin)
 
     # Obtain the spectrum for the noise value
-    doutfp = dout
     fin = f         # input signal frequency stays the same
     fs = Fs         # fs stays the same
     osr = OSR       # osr stays the same

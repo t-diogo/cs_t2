@@ -21,6 +21,10 @@ def second_order_sigma_delta_modulator(vin):
     x1 = np.zeros(npoints)  # First integrator state
     x2 = np.zeros(npoints)  # Second integrator state
 
+    # Init
+    x1[0]=1e-12
+    x2[0]=1e-12
+
     # Modulator loop
     for n in range(1, npoints):
         # Quantizer
@@ -41,15 +45,14 @@ def second_order_sigma_delta_modulator(vin):
 
 
 # Function to implement the third-order sinc filter
-def third_order_sinc_filter(dout, M):
-
-    # Integration
+def third_order_sinc_filter(dout, N):
+    # Initialize integrator variables
     int1 = np.cumsum(dout)
     int2 = np.cumsum(int1)
     int3 = np.cumsum(int2)
 
     # Decimation
-    decim = int3[::M]
+    decim = int3[::N]
 
     # Differentiation
     diff1 = np.diff(np.concatenate(([0], decim)))
@@ -57,7 +60,7 @@ def third_order_sinc_filter(dout, M):
     diff3 = np.diff(np.concatenate(([0], diff2)))
 
     # Gain correction
-    filtered_signal = diff3 / (M ** 3)
+    filtered_signal = diff3 / (N ** 3)
 
     return filtered_signal
 
@@ -68,15 +71,28 @@ def third_order_sinc_filter(dout, M):
 # Modulator parameters
 Vr = 2.24
 
-B = 20e3            # Signal bandwidth
 OSR = 100           # Oversampling ratio
+B = 20e3            # Signal bandwidth
 Fs = 2*B*OSR        # Sampling frequency
 
 
 # Simulation parameters
-np_points = 40000       # Number of points
-sinad = True           # do SINAD analysis (True) or regular input signal (False) - f)
+np_points = 50000       # Number of points
+
 real = False            # test with integrators with finite gain (True) or infinite gain (False) - g)
+sinad= False            # do SINAD analysis (True) or regular input signal (False) - f)
+
+# Input Signal parameters
+if sinad:
+    # SINAD analysis - different noise levels and amplitudes
+    #noise_levels = [1e-4]                      # Single (adequate) noise level    
+    noise_levels = [1e-6, 1e-5, 1e-4, 1e-3]     # Multiple noise levels
+    Ain_values = np.logspace(np.log10(1e-4), np.log10(np.sqrt(2)), 1000)
+
+else:
+    # Regular input signal - only one amplitude and noise level
+    Ain_values = [Vr/2]
+    noise_levels = [1e-4]
 
 # Define coefficients
 k1 = 1
@@ -95,20 +111,11 @@ if real:
 # Input signal - sine wave 1kHz
 f = 1e3
 f = round((f/Fs) * np_points) * (Fs/np_points)
-t = np.arange(np_points) / Fs
 print(f'f={f}Hz')
 
-# Input Signal parameters
-if sinad:
-    # SINAD analysis - different noise levels and amplitudes
-    Ain_values = np.logspace(np.log10(1e-4), Vr*np.log10(np.sqrt(2)), 1000)
-    noise_levels = [1e-4]                                                   # Single (adequate) noise level    
-    noise_levels = [1e-6, 1e-5, 1e-4, 1e-3]                                 # Multiple noise levels
-else:
-    # Regular input signal - only one amplitude and noise level
-    Ain_values = [Vr/2]
-    #noise_levels = [1e-5]
-    noise_levels = [1e-5]                                                      # No noise
+# Time vector
+t = np.arange(np_points) / Fs
+
 
 # Initialize the results storage
 results_nofilter = {noise: [] for noise in noise_levels}
@@ -117,16 +124,22 @@ results_filtered = {noise: [] for noise in noise_levels}
 
 ###################### Simulation loop ######################
 
-# The variables for the modulator are initialized in the function
+
+# Initialize variables for the modulator
+e1 = np.zeros(np_points)        # First integrator error
+e2 = np.zeros(np_points)        # Second integrator error
+x1 = np.zeros(np_points)        # First integrator state
+x2 = np.zeros(np_points)        # Second integrator state
+dout = np.zeros(np_points)      # Quantizer output
 
 # Initialize variables for the decimation filter
-M = int (OSR)
-len_dec = (np_points // M) + 1
+N = int (OSR)
+len_dec = (len(dout) // N) + 1
 
 # Initialize integrator variables
-int1 = np.zeros(np_points)
-int2 = np.zeros(np_points)
-int3 = np.zeros(np_points)
+int1 = np.zeros(len(dout))
+int2 = np.zeros(len(dout))
+int3 = np.zeros(len(dout))
 
 # Initialize differentiator variables
 diff1 = np.zeros(len_dec)
@@ -138,11 +151,12 @@ diff3 = np.zeros(len_dec)
 
 start_time = time.time()
 
-for noise in noise_levels:
-    print(f'Noise level: {noise*1e6:.0f}uV')
+for Vnoise in noise_levels:
+    print(f'Noise level: {Vnoise*1e6:.0f}uV')
     for Ain in Ain_values:
+
         # Create input signal
-        vin = Ain * np.sin(2 * np.pi * f * t) + np.random.randn(np_points) * noise
+        vin = Ain * np.sin(2 * np.pi * f * t) + np.random.randn(np_points) * Vnoise
 
         # Modulator
         dout = second_order_sigma_delta_modulator(vin)
@@ -165,10 +179,10 @@ for noise in noise_levels:
 
 
         # Decimation filter
-        doutf = third_order_sinc_filter(dout, M)
+        doutf = third_order_sinc_filter(dout, N)
         fin = f         # input signal frequency stays the same
-        fs = Fs/M       # fs = 2B = nyquist frequency
-        osr = OSR/M     # osr has to be divided to maintain the ratio with number of points in dout
+        fs = Fs/N       # fs = 2B = nyquist frequency
+        osr = OSR/N     # osr has to be divided to maintain the ratio with number of points in dout
 
         # Calculate SNDR at the output of the filter
         Nfft = len(doutf)
@@ -183,8 +197,8 @@ for noise in noise_levels:
         
         # Store results
         if sinad:
-            results_nofilter[noise].append(SNDR_nofilter)
-            results_filtered[noise].append(SNDR_filtered)
+            results_nofilter[Vnoise].append(SNDR_nofilter)
+            results_filtered[Vnoise].append(SNDR_filtered)
 
 
 stop_time = time.time()
@@ -290,8 +304,8 @@ else:
     # Output spectrum for filtered (sinc filter) output
 
     fin = f         # input signal frequency stays the same
-    fs = Fs/M       # fs = 2B = nyquist frequency
-    osr = OSR/M     # osr has to be divided to maintain the ratio with number of points in dout
+    fs = Fs/N       # fs = 2B = nyquist frequency
+    osr = OSR/N     # osr has to be divided to maintain the ratio with number of points in dout
 
     text_SNDR=f'SNDR={SNDR_filtered:.2f}'+f' dB\n Ps= {10*np.log10(abs(Ps_filtered))+5.88:.2f} dB'
     print('Ps=',Ps_filtered,'PN=',Pn_filtered,text_SNDR)
